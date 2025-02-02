@@ -264,6 +264,29 @@ reboot_cmd_unsupported(const shutdown_type_t type)
     }
 }
 
+// really not pretty. DO NOT COMMIT
+static const char *stringify(const shutdown_type_t type)
+{
+    switch (type) {
+    case shutdown_type_t::NONE:
+        return "NONE";
+    case shutdown_type_t::REMAIN:
+        return "REMAIN";
+    case shutdown_type_t::HALT:
+        return "HALT";
+    case shutdown_type_t::POWEROFF:
+        return "POWEROFF";
+    case shutdown_type_t::REBOOT:
+        return "REBOOT";
+    case shutdown_type_t::SOFTREBOOT:
+        return "SOFTREBOOT";
+    case shutdown_type_t::KEXEC:
+        return "KEXEC";
+    default:
+        return "<WARNING! UNKNOWN!>";
+    }
+}
+
 
 int main(int argc, char **argv)
 {
@@ -398,7 +421,7 @@ int main(int argc, char **argv)
         buf[0] = (dinit_cptypes::cp_cmd_t)cp_cmd::SHUTDOWN;
         buf[1] = static_cast<char>(shutdown_type);
 
-        cout << "Issuing shutdown command..." << endl;
+        cout << "Issuing shutdown command: " << stringify(shutdown_type) << endl;
 
         write_all_x(socknum, buf, bufsize);
 
@@ -407,7 +430,8 @@ int main(int argc, char **argv)
         wait_for_reply(rbuffer, socknum);
         
         if (rbuffer[0] != (dinit_cptypes::cp_rply_t)cp_rply::ACK) {
-            cerr << "shutdown: control socket protocol error" << endl;
+            cerr << "shutdown: control socket protocol error: expected "
+                 << static_cast<int>(cp_rply::ACK) << "; got " << static_cast<int>(rbuffer[0]) << endl;
             return 1;
         }
     }
@@ -467,7 +491,9 @@ void do_system_shutdown(shutdown_type_t shutdown_type)
     loop_t loop;
     subproc_buffer sub_buf {loop, STDOUT_FILENO};
 
-    sub_buf.append("Sending TERM/KILL to all processes...\n");
+    sub_buf.append("Shutdown type received: ");
+    sub_buf.append(stringify(shutdown_type));
+    sub_buf.append("\nSending TERM/KILL to all processes...\n");
     
     // Send TERM/KILL to all (remaining) processes
     kill(-1, SIGTERM);
@@ -537,7 +563,9 @@ void do_system_shutdown(shutdown_type_t shutdown_type)
 #else
     if (reboot(reboot_type)) {
         // we're in trouble now
-        sub_buf.append("reboot(2): ");
+        char hexbuf[sizeof("reboot(0x") + sizeof(int) * 2 + sizeof("): ")];
+        snprintf(hexbuf, sizeof hexbuf, "reboot(0x%X): ", reboot_type);
+        sub_buf.append(hexbuf);
         sub_buf.append(strerror(errno));
         sub_buf.append(
                 "\nThis may happen if you try to kexec without loading an image first, or if\n"
