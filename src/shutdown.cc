@@ -249,19 +249,11 @@ class subproc_buffer : private cpbuffer<subproc_bufsize>
 static bool
 reboot_cmd_unsupported(const shutdown_type_t type)
 {
-    // weed out unsupported values
-    switch (type) {
-#if !defined(RB_HALT_SYSTEM) && !defined(RB_HALT)
-    case shutdown_type_t::HALT: return true;
-#endif
-#ifndef RB_POWER_OFF
-    case shutdown_type_t::POWEROFF: return true;
-#endif
-#ifndef RB_KEXEC
-    case shutdown_type_t::KEXEC: return true;
-#endif
-    default: return false;
-    }
+    for (const auto& i: shutdown_table)
+        if (type == i.type)
+            return i.rb_cmd == -2;
+    // unreachable
+    return false;
 }
 
 // really not pretty. DO NOT COMMIT
@@ -312,24 +304,22 @@ int main(int argc, char **argv)
                 show_help = true;
                 break;
             }
-            
+
+            if (argv[i][0] == '-' && argv[i][1] && !argv[i][2]) {
+                bool found = false;
+                for (const auto& j: shutdown_table) {
+                    if (argv[i][1] == j.opt) {
+                        shutdown_type = j.type;
+                        found = true;
+                        break;
+                    }
+                }
+                if (found)
+                    continue; // egh
+            }
+
             if (strcmp(argv[i], "--system") == 0) {
                 sys_shutdown = true;
-            }
-            else if (strcmp(argv[i], "-r") == 0) {
-                shutdown_type = shutdown_type_t::REBOOT;
-            }
-            else if (strcmp(argv[i], "-h") == 0) {
-                shutdown_type = shutdown_type_t::HALT;
-            }
-            else if (strcmp(argv[i], "-p") == 0) {
-                shutdown_type = shutdown_type_t::POWEROFF;
-            }
-            else if (strcmp(argv[i], "-s") == 0) {
-                shutdown_type = shutdown_type_t::SOFTREBOOT;
-            }
-            else if (strcmp(argv[i], "-k") == 0) {
-                shutdown_type = shutdown_type_t::KEXEC;
             }
             else if (strcmp(argv[i], "--use-passed-cfd") == 0) {
                 use_passed_cfd = true;
@@ -470,17 +460,13 @@ void do_system_shutdown(shutdown_type_t shutdown_type)
     sigprocmask(SIG_SETMASK, &allsigs, nullptr);
     
     int reboot_type = RB_AUTOBOOT; // reboot
-#if defined(RB_POWER_OFF)
-    if (shutdown_type == shutdown_type_t::POWEROFF) reboot_type = RB_POWER_OFF;
-#endif
-#if defined(RB_HALT_SYSTEM)
-    if (shutdown_type == shutdown_type_t::HALT) reboot_type = RB_HALT_SYSTEM;
-#elif defined(RB_HALT)
-    if (shutdown_type == shutdown_type_t::HALT) reboot_type = RB_HALT;
-#endif
-#if defined(RB_KEXEC)
-    if (shutdown_type == shutdown_type_t::KEXEC) reboot_type = RB_KEXEC;
-#endif
+    for (const auto& i: shutdown_table) {
+        if (shutdown_type == i.type) {
+            if (i.rb_cmd >= 0)
+                reboot_type = i.rb_cmd;
+            break;
+        }
+    }
     
     // Write to console rather than any terminal, since we lose the terminal it seems:
     int consfd = open("/dev/console", O_WRONLY);

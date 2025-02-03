@@ -74,11 +74,18 @@ bool control_conn_t::process_packet()
                 return true;
             }
 
-            if (contains({shutdown_type_t::REMAIN, shutdown_type_t::HALT,
-                    shutdown_type_t::POWEROFF, shutdown_type_t::REBOOT,
-                    shutdown_type_t::SOFTREBOOT, shutdown_type_t::KEXEC}, rbuf[1])) {
-                auto sd_type = static_cast<shutdown_type_t>(rbuf[1]);
+            {
+                bool valid = false;
+                for (const auto& i: shutdown_table) {
+                    if (static_cast<char>(i.type) == rbuf[1]) {
+                        valid = true;
+                        break;
+                    }
+                }
+                if (!valid)
+                    break;
 
+                auto sd_type = static_cast<shutdown_type_t>(rbuf[1]);
                 services->stop_all_services(sd_type);
                 char ackBuf[] = { (char)cp_rply::ACK };
                 if (! queue_packet(ackBuf, 1)) return false;

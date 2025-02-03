@@ -764,19 +764,13 @@ int dinit_main(int argc, char **argv)
             flush_log();
         }
 
-        const char * cmd_arg;
-        if (shutdown_type == shutdown_type_t::HALT) {
-            cmd_arg = "-h";
-        }
-        else if (shutdown_type == shutdown_type_t::REBOOT) {
-            cmd_arg = "-r";
-        }
-        else if (shutdown_type == shutdown_type_t::KEXEC) {
-            cmd_arg = "-k";
-        }
-        else {
-            // power off.
-            cmd_arg = "-p";
+        char cmd_arg[3] = "-p";
+        for (const auto& i: shutdown_table) {
+            if (shutdown_type == i.type) {
+                if (i.rb_cmd != -1)
+                    cmd_arg[1] = i.opt;
+                break;
+            }
         }
         
         // Fork and execute dinit-reboot.
