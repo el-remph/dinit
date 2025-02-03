@@ -23,6 +23,7 @@
 #include "dinit-util.h"
 #include "mconfig.h"
 #include "control-datatypes.h"
+#include "shutdown-table.h"
 
 #include "dasynq.h"
 
@@ -249,10 +250,10 @@ class subproc_buffer : private cpbuffer<subproc_bufsize>
 static bool
 reboot_cmd_unsupported(const shutdown_type_t type)
 {
-    for (const auto& i: shutdown_table)
-        if (type == i.type)
-            return i.rb_cmd == -2;
-    // unreachable
+    auto *entry = shutdown_table.find(type);
+    if (entry)
+        return entry->rb_cmd == -2;
+    // should be unreachable
     return false;
 }
 
@@ -307,7 +308,7 @@ int main(int argc, char **argv)
 
             if (argv[i][0] == '-' && argv[i][1] && !argv[i][2]) {
                 bool found = false;
-                for (const auto& j: shutdown_table) {
+                for (const auto& j: shutdown_table.tbl) {
                     if (argv[i][1] == j.opt) {
                         shutdown_type = j.type;
                         found = true;
@@ -460,12 +461,10 @@ void do_system_shutdown(shutdown_type_t shutdown_type)
     sigprocmask(SIG_SETMASK, &allsigs, nullptr);
     
     int reboot_type = RB_AUTOBOOT; // reboot
-    for (const auto& i: shutdown_table) {
-        if (shutdown_type == i.type) {
-            if (i.rb_cmd >= 0)
-                reboot_type = i.rb_cmd;
-            break;
-        }
+    {
+        auto *row = shutdown_table.find(shutdown_type);
+        if (row && row->rb_cmd >= 0)
+            reboot_type = row->rb_cmd;
     }
     
     // Write to console rather than any terminal, since we lose the terminal it seems:

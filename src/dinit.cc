@@ -34,6 +34,7 @@
 #include "dinit-utmp.h"
 #include "dinit-env.h"
 #include "options-processing.h"
+#include "shutdown-table.h"
 
 #include "mconfig.h"
 
@@ -765,12 +766,10 @@ int dinit_main(int argc, char **argv)
         }
 
         char cmd_arg[3] = "-p";
-        for (const auto& i: shutdown_table) {
-            if (shutdown_type == i.type) {
-                if (i.rb_cmd != -1)
-                    cmd_arg[1] = i.opt;
-                break;
-            }
+        {
+            auto * row = shutdown_table.find(shutdown_type);
+            if (row && row->rb_cmd != -1)
+                cmd_arg[1] = row->opt;
         }
         
         // Fork and execute dinit-reboot.

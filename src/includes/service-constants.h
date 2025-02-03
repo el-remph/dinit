@@ -48,39 +48,6 @@ enum class shutdown_type_t: char {
     KEXEC              // Reboot with kexec (without firmware reinitialisation)
 };
 
-const struct {
-    shutdown_type_t type;
-    char opt; // '\0' if N/A
-    int64_t rb_cmd; // -1 if N/A, -2 if unsupported
-} shutdown_table[] = {
-    { shutdown_type_t::REMAIN, '\0', -1 },
-    { shutdown_type_t::HALT, 'h',
-#ifdef RB_HALT_SYSTEM
-      RB_HALT_SYSTEM
-#elif defined RB_HALT
-      RB_HALT
-#else
-      -2
-#endif
-    },
-    { shutdown_type_t::POWEROFF, 'p',
-#ifdef RB_POWER_OFF
-      RB_POWER_OFF
-#else
-      -2
-#endif
-    },
-    { shutdown_type_t::REBOOT, 'r', RB_AUTOBOOT },
-    { shutdown_type_t::SOFTREBOOT, 's', -1 },
-    { shutdown_type_t::KEXEC, 'k',
-#ifdef RB_KEXEC
-      RB_KEXEC
-#else
-      -2
-#endif
-    }
-};
-
 /* Reasons for why service stopped */
 enum class stopped_reason_t
 {

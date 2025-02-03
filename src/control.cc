@@ -8,6 +8,7 @@
 #include "service.h"
 #include "proc-service.h"
 #include "control-datatypes.h"
+#include "shutdown-table.h"
 
 // Server-side control protocol implementation. This implements the functionality that allows
 // clients (such as dinitctl) to query service state and issue commands to control services.
@@ -74,17 +75,8 @@ bool control_conn_t::process_packet()
                 return true;
             }
 
-            {
-                bool valid = false;
-                for (const auto& i: shutdown_table) {
-                    if (static_cast<char>(i.type) == rbuf[1]) {
-                        valid = true;
-                        break;
-                    }
-                }
-                if (!valid)
-                    break;
-
+            // hope this cast is defined
+            if (shutdown_table.find(static_cast<shutdown_type_t>(rbuf[1]))) {
                 auto sd_type = static_cast<shutdown_type_t>(rbuf[1]);
                 services->stop_all_services(sd_type);
                 char ackBuf[] = { (char)cp_rply::ACK };
